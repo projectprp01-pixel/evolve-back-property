@@ -1,4 +1,6 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://lume-backend-production.up.railway.app/api';
+// Relative — same-origin, proxied by the property server (server/index.js) which
+// attaches the auth token from the httpOnly session cookie before forwarding.
+const API_URL = '/api';
 
 export interface CheckIn {
   _id: string;
@@ -225,21 +227,15 @@ export interface PropertySettings {
 class DashboardAPI {
   private baseURL = API_URL;
 
+  // Auth is handled by the session cookie (httpOnly, sent automatically with
+  // `credentials: 'include'`) — the property server attaches the real bearer
+  // token when it proxies to the backend, so no token ever lives in client JS.
   private getHeaders(): HeadersInit {
-    const token = localStorage.getItem("eb-auth-token");
-    return {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }
-
-  private getAuthHeader(): HeadersInit {
-    const token = localStorage.getItem("eb-auth-token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return { "Content-Type": "application/json" };
   }
 
   private async request(url: string, options: RequestInit = {}, timeoutMs = 30_000): Promise<Response> {
-    return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+    return fetch(url, { ...options, credentials: 'include', signal: AbortSignal.timeout(timeoutMs) });
   }
 
   private async handleResponse(response: Response) {
@@ -250,16 +246,8 @@ class DashboardAPI {
   }
 
   // ==================== AUTH ====================
-  async login(email: string, password: string): Promise<{ token: string; staff: any }> {
-    const response = await this.request(`${this.baseURL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await response.json();
-    if (!data.success) throw new Error(data.message || "Login failed");
-    return { token: data.token, staff: data.staff };
-  }
+  // Login itself is handled by AuthContext via /session/login (sets the httpOnly
+  // cookie) — not proxied through here.
 
   async resetStaffPassword(staffId: string, newPassword: string): Promise<void> {
     const response = await this.request(`${this.baseURL}/dashboard/staff/${staffId}/password`, {
@@ -686,7 +674,6 @@ class DashboardAPI {
     formData.append('image', file);
     const response = await this.request(`${this.baseURL}/dashboard/restaurants/upload-image`, {
       method: 'POST',
-      headers: this.getAuthHeader(),
       body: formData,
     });
     const data = await response.json();
@@ -744,7 +731,6 @@ class DashboardAPI {
     formData.append('image', file);
     const response = await this.request(`${this.baseURL}/dashboard/experiences/upload-image`, {
       method: 'POST',
-      headers: this.getAuthHeader(),
       body: formData,
     });
     const data = await response.json();
@@ -759,7 +745,6 @@ class DashboardAPI {
     formData.append('image', file);
     const response = await this.request(`${this.baseURL}/dashboard/spa/upload-image`, {
       method: 'POST',
-      headers: this.getAuthHeader(),
       body: formData,
     });
     const data = await response.json();
@@ -775,7 +760,6 @@ class DashboardAPI {
     formData.append('image', file);
     const response = await this.request(`${this.baseURL}/dashboard/banners/upload`, {
       method: 'POST',
-      headers: this.getAuthHeader(),
       body: formData,
     });
     const data = await response.json();

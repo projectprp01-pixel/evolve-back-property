@@ -20,35 +20,28 @@ export interface AuthStaff {
 
 interface AuthContextValue {
   staff: AuthStaff | null;
-  token: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  isCheckingSession: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const API_URL = import.meta.env.VITE_API_URL || "https://lume-backend-production.up.railway.app/api";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [staff, setStaff] = useState<AuthStaff | null>(() => {
-    try {
-      const stored = localStorage.getItem("eb-auth-staff");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [token, setToken] = useState<string | null>(
-    () => localStorage.getItem("eb-auth-token")
-  );
+  const [staff, setStaff] = useState<AuthStaff | null>(null);
+  // The token lives in an httpOnly cookie now — unreadable by JS — so on first
+  // load we ask the server whether the cookie is still valid instead of
+  // synchronously reading a stored value.
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
-  const logout = () => {
-    localStorage.removeItem("eb-auth-token");
-    localStorage.removeItem("eb-auth-staff");
-    localStorage.removeItem("staffAuthenticated");
-    setToken(null);
+  const logout = async () => {
     setStaff(null);
+    try {
+      await fetch("/session/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // Cookie may already be gone server-side; client state is cleared regardless.
+    }
   };
 
   useEffect(() => {
@@ -57,25 +50,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("auth:expired", handleExpired);
   }, []);
 
+  useEffect(() => {
+    fetch("/session/me", { credentials: "include" })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (ok && data.success) setStaff(data.staff);
+      })
+      .catch(() => {
+        // Treat an unreachable session check as logged-out rather than blocking forever.
+      })
+      .finally(() => setIsCheckingSession(false));
+  }, []);
+
   const login = async (email: string, password: string) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch("/session/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
     const data = await response.json();
     if (!data.success) {
       throw new Error(data.message || "Login failed");
     }
-    localStorage.setItem("eb-auth-token", data.token);
-    localStorage.setItem("eb-auth-staff", JSON.stringify(data.staff));
-    setToken(data.token);
     setStaff(data.staff);
   };
 
   return (
     <AuthContext.Provider
-      value={{ staff, token, login, logout, isAuthenticated: !!staff && !!token }}
+      value={{ staff, login, logout, isAuthenticated: !!staff, isCheckingSession }}
     >
       {children}
     </AuthContext.Provider>

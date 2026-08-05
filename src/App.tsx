@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { PropertyProvider } from "@/context/PropertyContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
@@ -49,7 +50,15 @@ const queryClient = new QueryClient({
 });
 
 function AppContent() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, isCheckingSession, logout } = useAuth();
+
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
