@@ -1018,10 +1018,11 @@ class DashboardAPI {
     return data.data;
   }
 
-  async getTransportBookings(filters?: { propertyId?: string; checkInDate?: string }): Promise<any[]> {
+  async getTransportBookings(filters?: { propertyId?: string; checkInDate?: string; includePast?: boolean }): Promise<any[]> {
     const params = new URLSearchParams();
     if (filters?.propertyId) params.append('propertyId', filters.propertyId);
     if (filters?.checkInDate) params.append('checkInDate', filters.checkInDate);
+    if (filters?.includePast) params.append('includePast', 'true');
     const response = await this.request(`${this.baseURL}/dashboard/transport/bookings?${params}`, {
       headers: this.getHeaders(),
     });

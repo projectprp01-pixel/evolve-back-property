@@ -240,6 +240,7 @@ export default function Transport() {
   const [editingTierIndex, setEditingTierIndex] = useState<number | null>(null);
   const [cancelTarget, setCancelTarget] = useState<TransportBooking | null>(null);
   const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const [showPastBookings, setShowPastBookings] = useState(false);
   const [activeTab, setActiveTab] = useState('settings');
 
   // Add Booking dialog state
@@ -260,10 +261,11 @@ export default function Transport() {
   });
 
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
-    queryKey: ['transport-bookings', PROPERTY_ID, filterDate ? format(filterDate, 'yyyy-MM-dd') : null],
+    queryKey: ['transport-bookings', PROPERTY_ID, filterDate ? format(filterDate, 'yyyy-MM-dd') : null, showPastBookings],
     queryFn: () => dashboardAPI.getTransportBookings({
       propertyId: PROPERTY_ID,
       checkInDate: filterDate ? format(filterDate, 'yyyy-MM-dd') : undefined,
+      includePast: showPastBookings,
     }),
   });
 
@@ -569,6 +571,16 @@ export default function Transport() {
                     Clear
                   </Button>
                 )}
+                <div className="flex items-center gap-2 pl-2 border-l">
+                  <Switch
+                    id="show-past-bookings"
+                    checked={showPastBookings}
+                    onCheckedChange={setShowPastBookings}
+                  />
+                  <Label htmlFor="show-past-bookings" className="text-sm font-normal text-muted-foreground cursor-pointer">
+                    Show past bookings
+                  </Label>
+                </div>
               </div>
               {canWrite && (
                 <Button size="sm" className="gap-1.5" onClick={() => { setShowAddBooking(true); setNewBookingId(''); setNewGuestName(''); setNewCheckIn(null); setNewCheckOut(null); setNewNights(null); setNewAmount(''); setLookupError(''); }}>
@@ -585,7 +597,11 @@ export default function Transport() {
                 </div>
               ) : bookings.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
-                  {filterDate ? "No bookings for this date." : "No active transport bookings."}
+                  {filterDate
+                    ? "No bookings for this date."
+                    : showPastBookings
+                      ? "No transport bookings found."
+                      : "No active transport bookings."}
                 </div>
               ) : (
                 <div className="rounded-lg border overflow-hidden">
